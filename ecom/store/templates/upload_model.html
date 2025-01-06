@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Subir y Visualizar Modelo 3D</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        #viewer {
+            width: 60%; /* Ajusta el ancho del visor para hacerlo más pequeño */
+            height: 300px; /* Ajusta la altura del visor */
+            margin-top: 20px;
+            border: 1px solid #ccc; /* Borde para delimitar el visor */
+            background-color: #202020; /* Fondo oscuro para mejor contraste */
+        }
+    </style>
+</head>
+<body>
+    <h2>Sube y visualiza tu modelo 3D</h2>
+
+    <!-- Input para seleccionar el archivo 3D -->
+    <input type="file" id="file-input" accept=".stl, .obj, .gltf, .glb, .fbx">
+    <button onclick="loadSelectedFile()">Visualizar</button>
+
+    <!-- Contenedor del visor 3D -->
+    <div id="viewer"></div>
+
+    <script>
+        const viewer = document.getElementById('viewer');
+
+        // Configuración básica de la escena
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+        renderer.setClearColor(0x202020); // Fondo oscuro para contraste
+        viewer.appendChild(renderer.domElement);
+
+        // Luz para la escena
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(1, 1, 1).normalize();
+        scene.add(light);
+
+        // Controles de órbita
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.zoomSpeed = 0.5;
+
+        // Función para ajustar el tamaño y centrar el modelo
+        function setDefaultScaleAndCenter(model) {
+            const box = new THREE.Box3().setFromObject(model);
+            const size = box.getSize(new THREE.Vector3());
+            const maxAxis = Math.max(size.x, size.y, size.z);
+
+            const scaleFactor = 2 / maxAxis;
+            model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+            box.setFromObject(model);
+            box.getCenter(model.position).multiplyScalar(-1);
+
+            camera.position.set(0, 0, 5);
+            camera.lookAt(new THREE.Vector3(0, 0, 0));
+        }
+
+        function loadSelectedFile() {
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Por favor, selecciona un archivo 3D compatible (.stl, .obj, .gltf, .glb, .fbx).");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const contents = event.target.result;
+
+                // Limpiar la escena antes de cargar un nuevo modelo
+                while (scene.children.length > 1) {
+                    scene.remove(scene.children[1]);
+                }
+
+                let loader;
+
+                if (file.name.endsWith('.stl')) {
+                    loader = new THREE.STLLoader();
+                    const geometry = loader.parse(contents);
+                    const material = new THREE.MeshPhongMaterial({ color: 0xffffff }); // Modelo blanco
+                    const mesh = new THREE.Mesh(geometry, material);
+                    scene.add(mesh);
+                    setDefaultScaleAndCenter(mesh);
+                } else if (file.name.endsWith('.obj')) {
+                    loader = new THREE.OBJLoader();
+                    const object = loader.parse(contents);
+                    object.traverse((child) => {
+                        if (child.isMesh) child.material = new THREE.MeshPhongMaterial({ color: 0xffffff }); // Modelo blanco
+                    });
+                    scene.add(object);
+                    setDefaultScaleAndCenter(object);
+                } else if (file.name.endsWith('.gltf') || file.name.endsWith('.glb')) {
+                    loader = new THREE.GLTFLoader();
+                    loader.parse(contents, '', (gltf) => {
+                        const model = gltf.scene;
+                        model.traverse((child) => {
+                            if (child.isMesh) child.material = new THREE.MeshPhongMaterial({ color: 0xffffff }); // Modelo blanco
+                        });
+                        scene.add(model);
+                        setDefaultScaleAndCenter(model);
+                    });
+                } else if (file.name.endsWith('.fbx')) {
+                    loader = new THREE.FBXLoader();
+                    loader.parse(contents, (object) => {
+                        object.traverse((child) => {
+                            if (child.isMesh) child.material = new THREE.MeshPhongMaterial({ color: 0xffffff }); // Modelo blanco
+                        });
+                        scene.add(object);
+                        setDefaultScaleAndCenter(object);
+                    });
+                } else {
+                    alert("Formato no soportado.");
+                    return;
+                }
+
+                animate();
+            };
+
+            // Verificar el tipo de archivo y leerlo
+            if (file.name.endsWith('.stl') || file.name.endsWith('.obj') || file.name.endsWith('.fbx')) {
+                reader.readAsArrayBuffer(file);
+            } else if (file.name.endsWith('.gltf') || file.name.endsWith('.glb')) {
+                reader.readAsText(file);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+{% endblock %}
